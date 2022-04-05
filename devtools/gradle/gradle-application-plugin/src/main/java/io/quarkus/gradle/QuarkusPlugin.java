@@ -21,7 +21,6 @@ import org.gradle.api.artifacts.ConfigurationContainer;
 import org.gradle.api.artifacts.ProjectDependency;
 import org.gradle.api.plugins.BasePlugin;
 import org.gradle.api.plugins.JavaPlugin;
-import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskContainer;
@@ -169,7 +168,7 @@ public class QuarkusPlugin implements Plugin<Project> {
 
         project.getPlugins().withType(
                 BasePlugin.class,
-                basePlugin -> tasks.getByName(BasePlugin.ASSEMBLE_TASK_NAME).dependsOn(quarkusBuild));
+                basePlugin -> tasks.named(BasePlugin.ASSEMBLE_TASK_NAME, task -> task.dependsOn(quarkusBuild)));
         project.getPlugins().withType(
                 JavaPlugin.class,
                 javaPlugin -> {
@@ -239,8 +238,7 @@ public class QuarkusPlugin implements Plugin<Project> {
                     quarkusBuild.configure(
                             task -> task.dependsOn(classesTask, resourcesTask, tasks.named(JavaPlugin.JAR_TASK_NAME)));
 
-                    SourceSetContainer sourceSets = project.getConvention().getPlugin(JavaPluginConvention.class)
-                            .getSourceSets();
+                    SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
 
                     SourceSet mainSourceSet = sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
                     SourceSet testSourceSet = sourceSets.getByName(SourceSet.TEST_SOURCE_SET_NAME);
@@ -289,8 +287,7 @@ public class QuarkusPlugin implements Plugin<Project> {
                         testNative.setClasspath(nativeTestSourceSet.getRuntimeClasspath());
                     });
 
-                    tasks.withType(Test.class).forEach(configureTestTask);
-                    tasks.withType(Test.class).whenTaskAdded(configureTestTask::accept);
+                    tasks.withType(Test.class).configureEach(configureTestTask::accept);
 
                     SourceSet generatedSourceSet = sourceSets.create(QuarkusGenerateCode.QUARKUS_GENERATED_SOURCES);
                     SourceSet generatedTestSourceSet = sourceSets.create(QuarkusGenerateCode.QUARKUS_TEST_GENERATED_SOURCES);
@@ -373,8 +370,7 @@ public class QuarkusPlugin implements Plugin<Project> {
                 .sourceSetExtension();
 
         if (sourceSetExtension.extraNativeTest() != null) {
-            SourceSetContainer sourceSets = project.getConvention().getPlugin(JavaPluginConvention.class)
-                    .getSourceSets();
+            SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
             SourceSet nativeTestSourceSets = sourceSets.getByName(NATIVE_TEST_SOURCE_SET_NAME);
             nativeTestSourceSets.setCompileClasspath(
                     nativeTestSourceSets.getCompileClasspath()
@@ -385,9 +381,9 @@ public class QuarkusPlugin implements Plugin<Project> {
                             .plus(sourceSets.getByName(INTEGRATION_TEST_SOURCE_SET_NAME).getOutput())
                             .plus(sourceSetExtension.extraNativeTest().getOutput()));
 
-            configurations.findByName(NATIVE_TEST_IMPLEMENTATION_CONFIGURATION_NAME).extendsFrom(
+            configurations.getByName(NATIVE_TEST_IMPLEMENTATION_CONFIGURATION_NAME).extendsFrom(
                     configurations.findByName(sourceSetExtension.extraNativeTest().getImplementationConfigurationName()));
-            configurations.findByName(NATIVE_TEST_RUNTIME_ONLY_CONFIGURATION_NAME).extendsFrom(
+            configurations.getByName(NATIVE_TEST_RUNTIME_ONLY_CONFIGURATION_NAME).extendsFrom(
                     configurations.findByName(sourceSetExtension.extraNativeTest().getRuntimeOnlyConfigurationName()));
         }
     }

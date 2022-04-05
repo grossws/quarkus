@@ -9,8 +9,8 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.plugins.JavaPlugin;
-import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.testing.Test;
@@ -48,8 +48,8 @@ public class QuarkusExtensionPlugin implements Plugin<Project> {
 
         TaskProvider<ExtensionDescriptorTask> extensionDescriptorTask = tasks.register(EXTENSION_DESCRIPTOR_TASK_NAME,
                 ExtensionDescriptorTask.class, task -> {
-                    JavaPluginConvention convention = project.getConvention().getPlugin(JavaPluginConvention.class);
-                    SourceSet mainSourceSet = convention.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+                    SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
+                    SourceSet mainSourceSet = sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
                     task.setOutputResourcesDir(mainSourceSet.getOutput().getResourcesDir());
                     task.setInputResourcesDir(mainSourceSet.getResources().getSourceDirectories().getAsPath());
                     task.setQuarkusExtensionConfiguration(quarkusExt);
@@ -68,7 +68,7 @@ public class QuarkusExtensionPlugin implements Plugin<Project> {
                 javaPlugin -> {
                     tasks.named(JavaPlugin.PROCESS_RESOURCES_TASK_NAME, task -> task.finalizedBy(extensionDescriptorTask));
                     tasks.named(JavaPlugin.COMPILE_JAVA_TASK_NAME, task -> task.dependsOn(extensionDescriptorTask));
-                    tasks.withType(Test.class, test -> test.useJUnitPlatform());
+                    tasks.withType(Test.class).configureEach(Test::useJUnitPlatform);
                     addAnnotationProcessorDependency(project);
                 });
 
@@ -87,7 +87,7 @@ public class QuarkusExtensionPlugin implements Plugin<Project> {
                     task.setDeploymentModuleClasspath(deploymentModuleClasspath);
                 });
 
-                deploymentProject.getTasks().withType(Test.class, test -> {
+                deploymentProject.getTasks().withType(Test.class).configureEach(test -> {
                     test.useJUnitPlatform();
                     test.doFirst(task -> {
                         final Map<String, Object> props = test.getSystemProperties();
